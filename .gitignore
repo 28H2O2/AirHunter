@@ -1,2 +1,6 @@
+# file type
 *.zip
+
+# directory
+.conda
 utils/chromedriver-win64

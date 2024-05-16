@@ -1,52 +1,88 @@
-# 对同程艺龙 https://www.ly.com/flights的爬取
+# 对同程艺龙 https://www.ly.com/flights 的爬取
 from selenium import webdriver
-from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from time import sleep
-import random
+import pandas as pd
+import time
+import re
+from datetime import datetime
 
-# 确认你已下载并解压缩的ChromeDriver路径
+# ChromeDriver路径
 chrome_driver_path = "../utils/chromedriver-win64/chromedriver.exe"
 
-# 配置Selenium的选项
-options = webdriver.ChromeOptions()
-options.add_experimental_option('excludeSwitches', ['enable-automation'])
-options.add_experimental_option('useAutomationExtension', False)
-options.add_argument('--disable-blink-features')
-options.add_argument('--disable-blink-features=AutomationControlled')
-
-# 设置ChromeDriver服务
+# 设置ChromeDriver
 service = Service(executable_path=chrome_driver_path)
-driver = webdriver.Chrome(service=service, options=options)
+driver = webdriver.Chrome(service=service)
 
-# 反检测设置
-driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
-    "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-})
+# 打开目标网页
+url = "https://www.ly.com/flights/itinerary/oneway/SHA-PEK?date=2024-05-16&from=%E4%B8%8A%E6%B5%B7&to=%E5%8C%97%E4%BA%A3&fromairport=&toairport=&p=465&childticket=0,0"
+driver.get(url)
 
-# 定义抓取函数
-def scrape_flight_info(url):
-    driver.get(url)
-    sleep(random.uniform(1, 3))  # 随机等待时间以模拟用户行为
-    
+# 模拟用户行为防止被检测为爬虫
+time.sleep(3)
+
+# 等待包含航班信息的容器加载
+flights_container = WebDriverWait(driver, 10).until(
+    EC.presence_of_element_located((By.CLASS_NAME, 'flight-lists-container'))
+)
+flight_items = flights_container.find_elements(By.CLASS_NAME, 'flight-item')
+
+# 创建一个空的DataFrame来存储航班信息
+flights_data = []
+
+for i, flight in enumerate(flight_items, start=1):
     try:
-        # 等待页面加载并找到特定元素
-        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "flight-info-class-name")))
+        # 航班号
+        flight_no = flight.find_element(By.CLASS_NAME, 'flight-item-name').text.strip()
+        # 出发时间
+        departure_time = flight.find_element(By.CLASS_NAME, 'f-startTime').text.strip()
+        # 到达时间
+        arrival_time = flight.find_element(By.CLASS_NAME, 'f-endTime').text.strip()
+        # 出发机场
+        departure_airport = flight.find_element(By.XPATH, './/div[contains(@class, "f-times-con")][1]/em').text.strip()
+        # 到达机场
+        arrival_airport = flight.find_element(By.XPATH, './/div[contains(@class, "f-times-con")][2]/em').text.strip()
+        # 航班价格
+        price_text = flight.find_element(By.CLASS_NAME, 'head-prices').text.split('\n')[0]
+        price = ''.join(filter(str.isdigit, price_text))
 
-        # 这里是抓取航班信息的代码示例，需要根据实际网页结构调整
-        flight_info_elements = driver.find_elements(By.CLASS_NAME, "flight-info-class-name")
-        
-        for i, element in enumerate(flight_info_elements):
-            print(f"航班信息 {i+1}: {element.text}")
+        # 打印航班信息
+        print(f"第 {i} 航班:")
+        print(f"航班号: {flight_no}")
+        print(f"出发时间: {departure_time}")
+        print(f"到达时间: {arrival_time}")
+        print(f"出发机场: {departure_airport}")
+        print(f"到达机场: {arrival_airport}")
+        print(f"航班价格: ¥{price} 起")
+        print('-' * 40)
+
+        # 将数据添加到列表中
+        flights_data.append({
+            "航班号": flight_no,
+            "出发时间": departure_time,
+            "到达时间": arrival_time,
+            "出发机场": departure_airport,
+            "到达机场": arrival_airport,
+            "航班价格": price
+        })
 
     except Exception as e:
-        print(f"抓取时出错: {e}")
+        print(f"第 {i} 航班信息抓取失败: {str(e)}")
+        continue
 
-# 目标URL
-target_url = "https://www.ly.com/flights/itinerary/oneway/SHA-PEK?date=2024-05-16&from=%E4%B8%8A%E6%B5%B7&to=%E5%8C%97%E4%BA%AC&fromairport=&toairport=&p=465&childticket=0,0"
-scrape_flight_info(target_url)
-
-# 关闭驱动
 driver.quit()
+
+# 获取当前时间，精确到分钟
+current_time = datetime.now().strftime("%Y%m%d_%H%M")
+# 提取URL中的出发地和日期
+route_date = re.search(r"SHA-PEK\?date=(\d{4}-\d{2}-\d{2})", url).group(1)
+# 拼接文件名
+file_name = f"data/flights_data_{route_date}_{current_time}.csv"
+
+# 将数据保存到CSV文件
+df = pd.DataFrame(flights_data)
+df.to_csv(file_name, index=False, encoding='utf-8-sig')
+print(f"航班信息已保存到 {file_name} 文件中。")
+
