@@ -54,7 +54,7 @@ def extract_flight_info(flight):
     
     return {
         "航空公司": airline,
-        "航班编号": flight_code,
+        "航班号": flight_code,
         "出发时间": departure_time,
         "到达时间": arrival_time,
         "出发机场": departure_airport,
@@ -62,7 +62,7 @@ def extract_flight_info(flight):
         "航班价格": price
     }
 
-def save_to_csv(data, url, path='data'):
+def save_to_csv(data, url, path='data/ly_flights'):
     """
     将采集到的数据保存为CSV文件，并按出发时间排序。
     """
