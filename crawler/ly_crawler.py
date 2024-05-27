@@ -1,4 +1,3 @@
-# 对同程艺龙 https://www.ly.com/flights 的爬取
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -51,7 +50,16 @@ def extract_flight_info(flight):
     # 价格处理
     price_text = flight.find_element(By.CLASS_NAME, 'head-prices').text.split('\n')[0]
     price = ''.join(filter(str.isdigit, price_text))
-    
+
+    # 机型
+    flight_type = flight.find_element(By.CLASS_NAME, 'flight-item-type').text.strip()
+
+    # 餐食
+    try:
+        meal_info = flight.find_element(By.CLASS_NAME, 'red-labels').text.strip()
+    except:
+        meal_info = '无餐食信息'
+
     return {
         "航空公司": airline,
         "航班号": flight_code,
@@ -59,7 +67,9 @@ def extract_flight_info(flight):
         "到达时间": arrival_time,
         "出发机场": departure_airport,
         "到达机场": arrival_airport,
-        "航班价格": price
+        "航班价格": price,
+        "机型": flight_type,
+        "餐食": meal_info
     }
 
 def save_to_csv(data, url, path='data/ly_flights'):
